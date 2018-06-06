@@ -1,0 +1,6 @@
+.idea
+Bot/bin
+Bot/obj
+*.log
+
+

@@ -14,7 +14,7 @@ namespace Bot
 //        private static string mapName = "AbyssalReefLE.SC2Map";
 //        private static string mapName = "AbiogenesisLE.SC2Map";
         
-        private static string mapName = "InterloperLE.SC2Map";
+        private static string mapName = "(2)16-BitLE.SC2Map";
 //        private static string mapName = "FrostLE.SC2Map";
         private static Race opponentRace = Race.Random;
         private static Difficulty opponentDifficulty = Difficulty.VeryEasy;

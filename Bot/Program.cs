@@ -7,7 +7,7 @@ namespace Bot
     class Program
     {
         // Settings for your bot.
-        private static Bot bot = new RaxBot();
+        private static BotFactory botFactory = new RaxBotFactory();
         private static Race race = Race.Terran;
 
         // Settings for single player mode.
@@ -26,9 +26,9 @@ namespace Bot
             try {
                 gc = new GameConnection();
                 if (args.Length == 0)
-                    gc.RunSinglePlayer(bot, mapName, race, opponentRace, opponentDifficulty).Wait();
+                    gc.RunSinglePlayer(botFactory, mapName, race, opponentRace, opponentDifficulty).Wait();
                 else {
-                    gc.RunLadder(bot, race, args).Wait();
+                    gc.RunLadder(botFactory, race, args).Wait();
                 }
             }
             catch (Exception ex) {

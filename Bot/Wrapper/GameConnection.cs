@@ -167,14 +167,25 @@ namespace Bot
             return response.Query;
         }
 
-        public async Task Run(Bot bot, uint playerId)
+        public async Task Run(BotFactory botFactory, uint playerId)
         {
             
             Request gameInfoReq = new Request();
             gameInfoReq.GameInfo = new RequestGameInfo();
 
             Response gameInfoResponse = await proxy.SendRequest(gameInfoReq);
-            
+
+            Request dataReq = new Request();
+            dataReq.Data = new RequestData();
+            dataReq.Data.UnitTypeId = true;
+            dataReq.Data.AbilityId = true;
+            dataReq.Data.BuffId = true;
+            dataReq.Data.EffectId = true;
+            dataReq.Data.UpgradeId = true;
+
+            Response dataResponse = await proxy.SendRequest(dataReq);
+
+            var bot = botFactory.GetBot(gameInfoResponse.GameInfo, dataResponse.Data);
             while (true)
             {
                 Request observationRequest = new Request();
@@ -186,7 +197,7 @@ namespace Bot
                 if (response.Status == Status.Ended || response.Status == Status.Quit)
                     break;
                 
-                IEnumerable<SC2APIProtocol.Action> actions = bot.OnFrame(gameInfoResponse.GameInfo, observation, playerId);
+                IEnumerable<SC2APIProtocol.Action> actions = bot.OnFrame(observation, playerId);
 
                 Request actionRequest = new Request();
                 actionRequest.Action = new RequestAction();
@@ -201,7 +212,7 @@ namespace Bot
             }
         }
         
-        public async Task RunSinglePlayer(Bot bot, string map, Race myRace, Race opponentRace, Difficulty opponentDifficulty) {
+        public async Task RunSinglePlayer(BotFactory botFactory, string map, Race myRace, Race opponentRace, Difficulty opponentDifficulty) {
             var port = 5678;
             Logger.Info("Starting SinglePlayer Instance");
             StartSC2Instance(port);
@@ -211,21 +222,21 @@ namespace Bot
             await CreateGame(map, opponentRace, opponentDifficulty);
             Logger.Info("Joining game");
             uint playerId = await JoinGame(myRace);
-            await Run(bot, playerId);
+            await Run(botFactory, playerId);
         }
 
-        public async Task RunLadder(Bot bot, Race myRace, int gamePort, int startPort)
+        public async Task RunLadder(BotFactory botFactory, Race myRace, int gamePort, int startPort)
         {
             await Connect(gamePort);
             uint playerId = await JoinGameLadder(myRace, startPort);
-            await Run(bot, playerId);
+            await Run(botFactory, playerId);
             await RequestLeaveGame();
         }
 
-        public async Task RunLadder(Bot bot, Race myRace, string[] args)
+        public async Task RunLadder(BotFactory botFactory, Race myRace, string[] args)
         {
             CLArgs clargs = new CLArgs(args);
-            await RunLadder(bot, myRace, clargs.GamePort, clargs.StartPort);
+            await RunLadder(botFactory, myRace, clargs.GamePort, clargs.StartPort);
         }
     }
 }

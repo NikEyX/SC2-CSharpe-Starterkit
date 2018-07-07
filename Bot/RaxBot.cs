@@ -28,6 +28,15 @@ namespace Bot
         private static Random random = new Random(GenerateSeed());       
         private Controller controller = new Controller(0);
 
+        private ResponseGameInfo gameInfo;
+        private ResponseData gameData;
+
+        public RaxBot(ResponseGameInfo _gameInfo, ResponseData _gameData)
+        {
+            gameInfo = _gameInfo;
+            gameData = _gameData;
+        }
+
         private static int GenerateSeed() {
             var currentDayOfYear = DateTime.Now.DayOfYear;
             var currentMinute = DateTime.Now.Minute;
@@ -38,19 +47,19 @@ namespace Bot
 
 
 
-        public void OnStart(ResponseGameInfo gameInfo, ResponseObservation obs, uint playerId) {
+        public void OnStart(ResponseGameInfo gameInfo, ResponseObservation obs, uint playerId)
+        {
             Logger.Info("GAME STARTED");
         }
-        
-        public void OnEnd(ResponseGameInfo gameInfo, ResponseObservation obs, uint playerId, Result result) {
+
+        public void OnEnd(ResponseGameInfo gameInfo, ResponseObservation obs, uint playerId, Result result)
+        {
             Logger.Info("GAME ENDED");
             Logger.Info("Result: {0}", result);
-            
-            
         }
-        
 
-        public IEnumerable<SC2APIProtocol.Action> OnFrame(ResponseGameInfo gameInfo, ResponseObservation obs, uint playerId)
+
+        public IEnumerable<SC2APIProtocol.Action> OnFrame(ResponseObservation obs, uint playerId)
         {
             controller.OpenFrame(gameInfo, obs);
 
@@ -107,6 +116,14 @@ namespace Bot
             
 
             return controller.CloseFrame();
+        }
+    }
+
+    class RaxBotFactory : BotFactory
+    {
+        public Bot GetBot(ResponseGameInfo gameInfo, ResponseData gameData)
+        {
+            return new RaxBot(gameInfo, gameData);
         }
     }
 }

@@ -7,6 +7,11 @@ namespace Bot
 {
     public interface Bot
     {
-        IEnumerable<SC2APIProtocol.Action> OnFrame(ResponseGameInfo gameInfo, ResponseObservation observation, uint playerId);
+        IEnumerable<SC2APIProtocol.Action> OnFrame(ResponseObservation observation, uint playerId);
+    }
+
+    public interface BotFactory
+    {
+        Bot GetBot(ResponseGameInfo gameInfo, ResponseData gameData);
     }
 }

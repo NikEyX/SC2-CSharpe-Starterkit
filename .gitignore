@@ -4,3 +4,5 @@ Bot/obj
 *.log
 
 
+/.vs/Bot/v15
+/.vs

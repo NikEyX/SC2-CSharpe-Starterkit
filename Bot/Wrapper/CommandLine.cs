@@ -1,99 +1,61 @@
 ﻿using System.Linq;
 using SC2APIProtocol;
 
-namespace Bot
-{
+namespace Bot {
     /* This class is used to load the CommandLine arguments for the bot.
      */
-    class CLArgs
-    {
-        private int gamePort;
-        private int startPort;
-        private string ladderServer;
-        private Race computerRace = Race.NoRace;
-        private Difficulty computerDifficulty = Difficulty.Unset;
-
-        public CLArgs(string[] args)
-        {
+    internal class CLArgs {
+        public CLArgs(string[] args) {
             for (var i = 0; i < args.Count(); i += 2)
-            {
-                if (args[i] == "-g" || args[i] == "--GamePort")
-                    gamePort = int.Parse(args[i + 1]);
-                else if (args[i] == "-o" || args[i] == "--StartPort")
-                    startPort = int.Parse(args[i + 1]);
-                else if (args[i] == "-l" || args[i] == "--LadderServer")
-                    ladderServer = args[i + 1];
-                else if (args[i] == "-c" || args[i] == "--ComputerOpponent")
-                {
-                    if (computerRace == Race.NoRace)
-                        computerRace = Race.Random;
-                    if (computerDifficulty == Difficulty.Unset)
-                        computerDifficulty = Difficulty.VeryHard;
+                if (args[i] == "-g" || args[i] == "--GamePort") {
+                    GamePort = int.Parse(args[i + 1]);
+                }
+                else if (args[i] == "-o" || args[i] == "--StartPort") {
+                    StartPort = int.Parse(args[i + 1]);
+                }
+                else if (args[i] == "-l" || args[i] == "--LadderServer") {
+                    LadderServer = args[i + 1];
+                }
+                else if (args[i] == "-c" || args[i] == "--ComputerOpponent") {
+                    if (ComputerRace == Race.NoRace)
+                        ComputerRace = Race.Random;
+                    if (ComputerDifficulty == Difficulty.Unset)
+                        ComputerDifficulty = Difficulty.VeryHard;
                     i--;
                 }
-                else if (args[i] == "-a" || args[i] == "--ComputerRace")
-                {
+                else if (args[i] == "-a" || args[i] == "--ComputerRace") {
                     if (args[i + 1] == "Protoss")
-                        computerRace = Race.Protoss;
+                        ComputerRace = Race.Protoss;
                     else if (args[i + 1] == "Terran")
-                        computerRace = Race.Terran;
+                        ComputerRace = Race.Terran;
                     else if (args[i + 1] == "Zerg")
-                        computerRace = Race.Zerg;
+                        ComputerRace = Race.Zerg;
                     else if (args[i + 1] == "Random")
-                        computerRace = Race.Random;
+                        ComputerRace = Race.Random;
                 }
-                else if (args[i] == "-d" || args[i] == "--ComputerDifficulty")
-                {
-                    if (args[i + 1] == "VeryEasy")
-                    {
-                        computerDifficulty = Difficulty.VeryEasy;
-                    }
-                    if (args[i + 1] == "Easy")
-                    {
-                        computerDifficulty = Difficulty.Easy;
-                    }
-                    if (args[i + 1] == "Medium")
-                    {
-                        computerDifficulty = Difficulty.Medium;
-                    }
-                    if (args[i + 1] == "MediumHard")
-                    {
-                        computerDifficulty = Difficulty.MediumHard;
-                    }
-                    if (args[i + 1] == "Hard")
-                    {
-                        computerDifficulty = Difficulty.Hard;
-                    }
-                    if (args[i + 1] == "Harder")
-                    {
-                        computerDifficulty = Difficulty.Harder;
-                    }
-                    if (args[i + 1] == "VeryHard")
-                    {
-                        computerDifficulty = Difficulty.VeryHard;
-                    }
-                    if (args[i + 1] == "CheatVision")
-                    {
-                        computerDifficulty = Difficulty.CheatVision;
-                    }
-                    if (args[i + 1] == "CheatMoney")
-                    {
-                        computerDifficulty = Difficulty.CheatMoney;
-                    }
-                    if (args[i + 1] == "CheatInsane")
-                    {
-                        computerDifficulty = Difficulty.CheatInsane;
-                    }
+                else if (args[i] == "-d" || args[i] == "--ComputerDifficulty") {
+                    if (args[i + 1] == "VeryEasy") ComputerDifficulty = Difficulty.VeryEasy;
+                    if (args[i + 1] == "Easy") ComputerDifficulty = Difficulty.Easy;
+                    if (args[i + 1] == "Medium") ComputerDifficulty = Difficulty.Medium;
+                    if (args[i + 1] == "MediumHard") ComputerDifficulty = Difficulty.MediumHard;
+                    if (args[i + 1] == "Hard") ComputerDifficulty = Difficulty.Hard;
+                    if (args[i + 1] == "Harder") ComputerDifficulty = Difficulty.Harder;
+                    if (args[i + 1] == "VeryHard") ComputerDifficulty = Difficulty.VeryHard;
+                    if (args[i + 1] == "CheatVision") ComputerDifficulty = Difficulty.CheatVision;
+                    if (args[i + 1] == "CheatMoney") ComputerDifficulty = Difficulty.CheatMoney;
+                    if (args[i + 1] == "CheatInsane") ComputerDifficulty = Difficulty.CheatInsane;
 
-                    computerDifficulty = Difficulty.Easy;
+                    ComputerDifficulty = Difficulty.Easy;
                 }
-            }
         }
 
-        public int GamePort { get => gamePort; set => gamePort = value; }
-        public int StartPort { get => startPort; set => startPort = value; }
-        public string LadderServer { get => ladderServer; set => ladderServer = value; }
-        public Race ComputerRace { get => computerRace; set => computerRace = value; }
-        public Difficulty ComputerDifficulty { get => computerDifficulty; set => computerDifficulty = value; }
+        public int GamePort { get; set; }
+
+        public int StartPort { get; set; }
+
+        public string LadderServer { get; set; }
+
+        public Race ComputerRace { get; set; } = Race.NoRace;
+        public Difficulty ComputerDifficulty { get; set; } = Difficulty.Unset;
     }
 }

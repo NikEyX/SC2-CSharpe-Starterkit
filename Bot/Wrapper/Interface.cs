@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 using SC2APIProtocol;
 
-namespace Bot
-{
-    public interface Bot
-    {
-        IEnumerable<SC2APIProtocol.Action> OnFrame();
+namespace Bot {
+    public interface Bot {
+        IEnumerable<Action> OnFrame();
     }
-
 }

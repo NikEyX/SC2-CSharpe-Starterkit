@@ -61,6 +61,7 @@
     <Compile Include="Protocol\Score.cs" />
     <Compile Include="Protocol\Spatial.cs" />
     <Compile Include="Protocol\Ui.cs" />
+    <Compile Include="Unit.cs" />
     <Compile Include="Wrapper\Interface.cs" />
     <Compile Include="Wrapper\CommandLine.cs" />
     <Compile Include="Wrapper\GameConnection.cs" />

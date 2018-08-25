@@ -786,5 +786,11 @@ namespace Bot {
             STARPORT_TECHLAB,
             STARPORT_REACTOR
         };
+        
+        public static readonly HashSet<uint> SupplyDepots = new HashSet<uint> {
+            SUPPLY_DEPOT,
+            SUPPLY_DEPOT_LOWERED
+        };
+
     }
 }

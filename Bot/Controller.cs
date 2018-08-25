@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Numerics;
+using System.Security.Cryptography;
 using System.Threading;
 using SC2APIProtocol;
 using Action = SC2APIProtocol.Action;
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Bot {
     public static class Controller {
@@ -27,9 +30,6 @@ namespace Bot {
         public static readonly List<Vector3> enemyLocations = new List<Vector3>();
         public static readonly List<string> chatLog = new List<string>();
 
-        public static UnitsHolder units = new UnitsHolder();
-
-
         public static void Pause() {
             Console.WriteLine("Press any key to continue...");
             while (Console.ReadKey().Key != ConsoleKey.Enter) {
@@ -41,29 +41,6 @@ namespace Bot {
             return (ulong) (FRAMES_PER_SECOND * seconds);
         }
 
-        private static void PopulateInventory() {
-            units = new UnitsHolder();
-            foreach (var unit in obs.Observation.RawData.Units) {
-                if (unit.Alliance != Alliance.Self) continue;
-                if (Units.ArmyUnits.Contains(unit.UnitType))
-                    units.army.Add(unit);
-
-                if (Units.Workers.Contains(unit.UnitType))
-                    units.workers.Add(unit);
-
-                if (Units.Structures.Contains(unit.UnitType))
-                    units.structures.Add(unit);
-
-                if (Units.ResourceCenters.Contains(unit.UnitType))
-                    units.resourceCenters.Add(unit);
-
-                if (unit.UnitType == Units.SUPPLY_DEPOT || unit.UnitType == Units.SUPPLY_DEPOT_LOWERED)
-                    units.depots.Add(unit);
-
-                if (unit.UnitType == Units.BARRACKS || unit.UnitType == Units.BARRACKS_FLYING)
-                    units.barracks.Add(unit);
-            }
-        }
 
         public static List<Action> CloseFrame() {
             return actions;
@@ -84,7 +61,8 @@ namespace Bot {
 
             actions.Clear();
 
-            foreach (var chat in obs.Chat) chatLog.Add(chat.Message);
+            foreach (var chat in obs.Chat) 
+                chatLog.Add(chat.Message);
 
             frame = obs.Observation.GameLoop;
             currentSupply = obs.Observation.PlayerCommon.FoodUsed;
@@ -92,16 +70,18 @@ namespace Bot {
             minerals = obs.Observation.PlayerCommon.Minerals;
             vespene = obs.Observation.PlayerCommon.Vespene;
 
-            PopulateInventory();
-
             //initialization
             if (frame == 0) {
-                var rcPosition = GetPosition(units.resourceCenters[0]);
-                foreach (var startLocation in gameInfo.StartRaw.StartLocations) {
-                    var enemyLocation = new Vector3(startLocation.X, startLocation.Y, 0);
-                    var distance = GetDistance(enemyLocation, rcPosition);
-                    if (distance > 30)
-                        enemyLocations.Add(enemyLocation);
+                var resourceCenters = GetUnits(Units.ResourceCenters);
+                if (resourceCenters.Count > 0) {
+                    var rcPosition = resourceCenters[0].position;
+
+                    foreach (var startLocation in gameInfo.StartRaw.StartLocations) {
+                        var enemyLocation = new Vector3(startLocation.X, startLocation.Y, 0);
+                        var distance = Vector3.Distance(enemyLocation, rcPosition);
+                        if (distance > 30)
+                            enemyLocations.Add(enemyLocation);
+                    }
                 }
             }
 
@@ -110,6 +90,10 @@ namespace Bot {
         }
 
 
+        public static string GetUnitName(uint unitType) {
+            return gameData.Units[(int) unitType].Name;
+        }
+
         public static void AddAction(Action action) {
             actions.Add(action);
         }
@@ -117,10 +101,7 @@ namespace Bot {
 
         public static void Chat(string message, bool team = false) {
             var actionChat = new ActionChat();
-            if (team)
-                actionChat.Channel = ActionChat.Types.Channel.Team;
-            else
-                actionChat.Channel = ActionChat.Types.Channel.Broadcast;
+            actionChat.Channel = team ? ActionChat.Types.Channel.Team : ActionChat.Types.Channel.Broadcast;
             actionChat.Message = message;
 
             var action = new Action();
@@ -129,88 +110,124 @@ namespace Bot {
         }
 
 
-        public static Vector3 GetPosition(Unit unit) {
-            return new Vector3(unit.Pos.X, unit.Pos.Y, unit.Pos.Z);
-        }
-
-        public static double GetDistance(Unit unit1, Unit unit2) {
-            return Vector3.Distance(GetPosition(unit1), GetPosition(unit2));
-        }
-
-        public static double GetDistance(Unit unit, Vector3 location) {
-            return Vector3.Distance(GetPosition(unit), location);
-        }
-
-        public static double GetDistance(Vector3 pos1, Vector3 pos2) {
-            return Vector3.Distance(pos1, pos2);
-        }
-
-
-        public static Unit GetMineralField() {
-            var mineralFields = GetUnits(Units.MineralFields, Alliance.Neutral);
-            foreach (var mf in mineralFields)
-            foreach (var rc in units.resourceCenters)
-                if (GetDistance(mf, rc) < 10)
-                    return mf;
-            return null;
-        }
-
         public static void Attack(List<Unit> units, Vector3 target) {
             var action = CreateRawUnitCommand(Abilities.ATTACK);
             action.ActionRaw.UnitCommand.TargetWorldSpacePos = new Point2D();
             action.ActionRaw.UnitCommand.TargetWorldSpacePos.X = target.X;
             action.ActionRaw.UnitCommand.TargetWorldSpacePos.Y = target.Y;
             foreach (var unit in units)
-                action.ActionRaw.UnitCommand.UnitTags.Add(unit.Tag);
+                action.ActionRaw.UnitCommand.UnitTags.Add(unit.tag);
             AddAction(action);
         }
 
-        public static List<Unit> GetUnits(HashSet<uint> hashset, Alliance alliance = Alliance.Self) {
+
+        public static int GetTotalCount(uint unitType) {
+            var pendingCount = GetPendingCount(unitType, inConstruction: false);
+            var constructionCount = GetUnits(unitType).Count;
+            return pendingCount + constructionCount;
+        }
+
+        public static int GetPendingCount(uint unitType, bool inConstruction=true) {
+            var workers = GetUnits(Units.Workers);
+            var abilityID = Abilities.GetID(unitType);
+            
+            var counter = 0;
+            
+            //count workers that have been sent to build this structure
+            foreach (var worker in workers) {
+                if (worker.order.AbilityId == abilityID)
+                    counter += 1;
+            }
+
+            //count buildings that are already in construction
+            if (inConstruction) {  
+                foreach (var unit in GetUnits(unitType))
+                    if (unit.buildProgress < 1)
+                        counter += 1;
+            }
+
+            return counter;
+        }
+
+        public static List<Unit> GetUnits(HashSet<uint> hashset, Alliance alliance=Alliance.Self, bool onlyCompleted=false, bool onlyVisible=false) {
+            //ideally this should be cached in the future and cleared at each new frame
             var units = new List<Unit>();
             foreach (var unit in obs.Observation.RawData.Units)
-                if (hashset.Contains(unit.UnitType) && unit.Alliance == alliance)
-                    units.Add(unit);
+                if (hashset.Contains(unit.UnitType) && unit.Alliance == alliance) {                    
+                    if (onlyCompleted && unit.BuildProgress < 1)
+                        continue;
+                    
+                    if (onlyVisible && (unit.DisplayType != DisplayType.Visible))
+                        continue;
+                                        
+                    units.Add(new Unit(unit));
+                }
             return units;
         }
 
-        private static List<Unit> GetUnits(uint unitType, Alliance alliance = Alliance.Self) {
+        public static List<Unit> GetUnits(uint unitType, Alliance alliance=Alliance.Self, bool onlyCompleted=false, bool onlyVisible=false) {
+            //ideally this should be cached in the future and cleared at each new frame
             var units = new List<Unit>();
             foreach (var unit in obs.Observation.RawData.Units)
-                if (unit.UnitType == unitType && unit.Alliance == alliance)
-                    units.Add(unit);
+                if (unit.UnitType == unitType && unit.Alliance == alliance) {
+                    if (onlyCompleted && unit.BuildProgress < 1)
+                        continue;
+
+                    if (onlyVisible && (unit.DisplayType != DisplayType.Visible))
+                        continue;
+
+                    units.Add(new Unit(unit));
+                }
             return units;
         }
 
 
-        public static bool CanAfford(uint buildingType) {
-            return minerals >= gameData.Units[(int) buildingType].MineralCost &&
-                   vespene >= gameData.Units[(int) buildingType].VespeneCost;
+        public static bool CanAfford(uint unitType) {
+            var unitData = gameData.Units[(int) unitType];
+            return (minerals >= unitData.MineralCost) && (vespene >= unitData.VespeneCost);
         }
 
-        public static bool CanConstruct(uint buildingType) {
-            if (units.workers.Count == 0) return false;
 
-            //we need rc for every unit
-            if (units.resourceCenters.Count == 0) return false;
-            foreach (var building in units.resourceCenters)
-                if (building.BuildProgress < 1.0)
+        public static bool CanConstruct(uint unitType) {
+            //is it a structure?
+            if (Units.Structures.Contains(unitType)) {
+                //we need worker for every structure
+                if (GetUnits(Units.Workers).Count == 0) return false;
+
+                //we need an RC for any structure
+                var resourceCenters = GetUnits(Units.ResourceCenters, onlyCompleted:true);
+                if (resourceCenters.Count == 0) return false;
+                
+                if ((unitType == Units.COMMAND_CENTER) || (unitType == Units.SUPPLY_DEPOT))
+                    return CanAfford(unitType);
+                
+                //we need supply depots for the following structures
+                var depots = GetUnits(Units.SupplyDepots, onlyCompleted:true);
+                if (depots.Count == 0) return false;
+                
+                if (unitType == Units.BARRACKS)
+                    return CanAfford(unitType);
+            }
+            
+            //it's an actual unit
+            else {                
+                //do we have enough supply?
+                var requiredSupply = Controller.gameData.Units[(int) unitType].FoodRequired;
+                if (requiredSupply > (maxSupply - currentSupply))
                     return false;
 
-            if (buildingType == Units.SUPPLY_DEPOT)
-                return CanAfford(buildingType);
-
-            foreach (var building in units.depots)
-                if (building.BuildProgress < 1.0)
-                    return false;
-
-            if (buildingType == Units.BARRACKS)
-                return CanAfford(buildingType);
-
-            //catch all
-            return CanAfford(buildingType);
+                //do we construct the units from barracks? 
+                if (Units.FromBarracks.Contains(unitType)) {
+                    var barracks = GetUnits(Units.BARRACKS, onlyCompleted:true);
+                    if (barracks.Count == 0) return false;
+                }
+                                
+            }
+            
+            return CanAfford(unitType);
         }
 
-        private static Action CreateRawUnitCommand(int ability) {
+        public static Action CreateRawUnitCommand(int ability) {
             var action = new Action();
             action.ActionRaw = new ActionRaw();
             action.ActionRaw.UnitCommand = new ActionRawUnitCommand();
@@ -218,121 +235,157 @@ namespace Bot {
             return action;
         }
 
-        private static uint GetUnitOrder(Unit unit) {
-            if (unit.Orders.Count == 0) return 0;
-            return unit.Orders[0].AbilityId;
+
+        public static bool CanPlace(uint unitType, Vector3 targetPos) {
+            //Note: this is a blocking call! Use it sparingly, or you will slow down your execution significantly!
+            var abilityID = Abilities.GetID(unitType);
+            
+            RequestQueryBuildingPlacement queryBuildingPlacement = new RequestQueryBuildingPlacement();
+            queryBuildingPlacement.AbilityId = abilityID;
+            queryBuildingPlacement.TargetPos = new Point2D();
+            queryBuildingPlacement.TargetPos.X = targetPos.X;
+            queryBuildingPlacement.TargetPos.Y = targetPos.Y;
+            
+            Request requestQuery = new Request();
+            requestQuery.Query = new RequestQuery();
+            requestQuery.Query.Placements.Add(queryBuildingPlacement);
+
+            var result = Program.gc.SendQuery(requestQuery.Query);
+            if (result.Result.Placements.Count > 0)
+                return (result.Result.Placements[0].Result == ActionResult.Success);
+            return false;
         }
 
-        public static void TrainWorker(Unit resourceCenter, bool queue = false) {
-            if (resourceCenter == null) return;
 
-            if (!queue && GetUnitOrder(resourceCenter) == Abilities.TRAIN_SCV)
+        public static void DistributeWorkers() {            
+            var workers = GetUnits(Units.Workers);
+            List<Unit> idleWorkers = new List<Unit>();
+            foreach (var worker in workers) {
+                if (worker.order.AbilityId != 0) continue;
+                idleWorkers.Add(worker);
+            }
+            
+            if (idleWorkers.Count > 0) {
+                var resourceCenters = GetUnits(Units.ResourceCenters, onlyCompleted:true);
+                var mineralFields = GetUnits(Units.MineralFields, onlyVisible: true, alliance:Alliance.Neutral);
+                
+                foreach (var rc in resourceCenters) {
+                    //get one of the closer mineral fields
+                    var mf = GetFirstInRange(rc.position, mineralFields, 7);
+                    if (mf == null) continue;
+                    
+                    //only one at a time
+                    Logger.Info("Distributing idle worker: {0}", idleWorkers[0].tag);                    
+                    idleWorkers[0].Smart(mf);                                        
+                    return;
+                }
+                //nothing to be done
                 return;
-
-            var action = CreateRawUnitCommand(Abilities.TRAIN_SCV);
-            action.ActionRaw.UnitCommand.UnitTags.Add(resourceCenter.Tag);
-            AddAction(action);
-        }
-
-
-        public static void TrainMarine(Unit barracks, bool queue = false) {
-            if (barracks == null) return;
-            if (!queue && GetUnitOrder(barracks) == Abilities.TRAIN_MARINE)
-                return;
-
-            var action = CreateRawUnitCommand(Abilities.TRAIN_MARINE);
-            action.ActionRaw.UnitCommand.UnitTags.Add(barracks.Tag);
-            AddAction(action);
-        }
-
-
-        public static void Construct(uint unitType) {
-            var worker = GetAvailableWorker();
-            if (worker == null) return;
-
-            Vector3 startingSpot;
-            if (units.resourceCenters.Count > 0) {
-                var cc = units.resourceCenters[0];
-                startingSpot = GetPosition(cc);
             }
             else {
-                startingSpot = GetPosition(worker);
-            }
-
-            var radius = 12;
-
-            //trying to find a valid construction spot
-            Vector3 constructionSpot;
-            while (true) {
-                constructionSpot = new Vector3(startingSpot.X + random.Next(-radius, radius + 1),
-                    startingSpot.Y + random.Next(-radius, radius + 1), worker.Pos.Z);
-                var valid = true;
-
-                //avoid building in the mineral line
-                foreach (var w in units.workers) {
-                    if (w.Tag == worker.Tag) continue;
-                    if (GetDistance(w, constructionSpot) <= 3) {
-                        valid = false;
-                        break;
-                    }
+                //let's see if we can distribute between bases                
+                var resourceCenters = GetUnits(Units.ResourceCenters, onlyCompleted:true);
+                Unit transferFrom = null;
+                Unit transferTo = null;
+                foreach (var rc in resourceCenters) {
+                    if (rc.assignedWorkers <= rc.idealWorkers)
+                        transferTo = rc;
+                    else
+                        transferFrom = rc;
                 }
 
-                if (valid) break;
+                if ((transferFrom != null) && (transferTo != null)) {
+                    var mineralFields = GetUnits(Units.MineralFields, onlyVisible: true, alliance:Alliance.Neutral);
+                    
+                    var sqrDistance = 7 * 7;
+                    foreach (var worker in workers) {
+                        if (worker.order.AbilityId != Abilities.GATHER_MINERALS) continue;
+                        if (Vector3.DistanceSquared(worker.position, transferFrom.position) > sqrDistance) continue;
+                                                
+                        var mf = GetFirstInRange(transferTo.position, mineralFields, 7);
+                        if (mf == null) continue;
+                    
+                        //only one at a time
+                        Logger.Info("Distributing idle worker: {0}", worker.tag);
+                        worker.Smart(mf);                    
+                        return;
+                    }
+                }
             }
-
-
-            var constructAction = CreateRawUnitCommand(Abilities.FromBuilding[unitType]);
-            constructAction.ActionRaw.UnitCommand.UnitTags.Add(worker.Tag);
-            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos = new Point2D();
-            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos.X = constructionSpot.X;
-            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos.Y = constructionSpot.Y;
-            AddAction(constructAction);
-
-            var mf = GetMineralField();
-            if (mf != null) {
-                var returnAction = CreateRawUnitCommand(Abilities.SMART);
-                returnAction.ActionRaw.UnitCommand.UnitTags.Add(worker.Tag);
-                returnAction.ActionRaw.UnitCommand.TargetUnitTag = mf.Tag;
-                returnAction.ActionRaw.UnitCommand.QueueCommand = true;
-                AddAction(returnAction);
-            }
-
-            Logger.Info("Attempting to construct: {0} @ {1} / {2}", unitType.ToString(), constructionSpot.X,
-                constructionSpot.Y);
         }
 
-        public static Unit GetAvailableWorker() {
-            foreach (var worker in units.workers) {
-                var order = GetUnitOrder(worker);
-                if (order == 0) return worker;
 
-                if (order != Abilities.GATHER_MINERALS) continue;
+        public static Unit GetAvailableWorker(Vector3 targetPosition) {
+            var workers = GetUnits(Units.Workers);
+            foreach (var worker in workers) {
+                if (worker.order.AbilityId != Abilities.GATHER_MINERALS) continue;
+                                
                 return worker;
             }
 
             return null;
         }
 
-
-        private static void FocusCamera(Unit unit) {
-            if (unit == null) return;
-            var action = new Action();
-            action.ActionRaw = new ActionRaw();
-            action.ActionRaw.CameraMove = new ActionRawCameraMove();
-            action.ActionRaw.CameraMove.CenterWorldSpace = new Point();
-            action.ActionRaw.CameraMove.CenterWorldSpace.X = unit.Pos.X;
-            action.ActionRaw.CameraMove.CenterWorldSpace.Y = unit.Pos.Y;
-            action.ActionRaw.CameraMove.CenterWorldSpace.Z = unit.Pos.Z;
-            actions.Add(action);
+        public static bool IsInRange(Vector3 targetPosition, List<Unit> units, float maxDistance) {
+            return (GetFirstInRange(targetPosition, units, maxDistance) != null);
+        }
+        
+        public static Unit GetFirstInRange(Vector3 targetPosition, List<Unit> units, float maxDistance) {
+            //squared distance is faster to calculate
+            var maxDistanceSqr = maxDistance * maxDistance;
+            foreach (var unit in units) {
+                if (Vector3.DistanceSquared(targetPosition, unit.position) <= maxDistanceSqr)
+                    return unit;
+            }
+            return null;
         }
 
-        public class UnitsHolder {
-            public readonly List<Unit> army = new List<Unit>();
-            public readonly List<Unit> barracks = new List<Unit>();
-            public readonly List<Unit> depots = new List<Unit>();
-            public readonly List<Unit> resourceCenters = new List<Unit>();
-            public readonly List<Unit> structures = new List<Unit>();
-            public readonly List<Unit> workers = new List<Unit>();
+        public static void Construct(uint unitType) {
+            Vector3 startingSpot;
+
+            var resourceCenters = GetUnits(Units.ResourceCenters);
+            if (resourceCenters.Count > 0)
+                startingSpot = resourceCenters[0].position;
+            else {                
+                Logger.Error("Unable to construct: {0}. No resource center was found.", GetUnitName(unitType));
+                return;
+            }
+
+            const int radius = 12;
+                              
+            //trying to find a valid construction spot
+            var mineralFields = GetUnits(Units.MineralFields, onlyVisible:true, alliance:Alliance.Neutral); 
+            Vector3 constructionSpot;
+            while (true) {
+                constructionSpot = new Vector3(startingSpot.X + random.Next(-radius, radius + 1), startingSpot.Y + random.Next(-radius, radius + 1), 0);                
+                
+                //avoid building in the mineral line
+                if (IsInRange(constructionSpot, mineralFields, 5)) continue;
+                
+                //check if the building fits
+                if (!CanPlace(unitType, constructionSpot)) continue;
+
+                //ok, we found a spot
+                break;
+            }
+
+            var worker = GetAvailableWorker(constructionSpot);
+            if (worker == null) {
+                Logger.Error("Unable to find worker to construct: {0}", GetUnitName(unitType));
+                return;
+            }
+
+            var abilityID = Abilities.GetID(unitType);
+            var constructAction = CreateRawUnitCommand(abilityID);
+            constructAction.ActionRaw.UnitCommand.UnitTags.Add(worker.tag);
+            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos = new Point2D();
+            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos.X = constructionSpot.X;
+            constructAction.ActionRaw.UnitCommand.TargetWorldSpacePos.Y = constructionSpot.Y;
+            AddAction(constructAction);
+
+            Logger.Info("Constructing: {0} @ {1} / {2}", GetUnitName(unitType), constructionSpot.X, constructionSpot.Y);
         }
+
+
     }
 }

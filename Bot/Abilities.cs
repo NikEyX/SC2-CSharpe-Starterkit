@@ -3,32 +3,6 @@
 namespace Bot {
     internal static class Abilities {
         //you can get all these values from the stableid.json file (just search for it on your PC)
-
-        public static int BUILD_SUPPLY_DEPOT = 319;
-        public static int BUILD_BARRACKS = 321;
-        public static int BUILD_BUNKER = 324;
-        public static int BUILD_REFINERY = 320;
-        public static int BUILD_FACTORY = 328;
-        public static int BUILD_STARPORT = 329;
-        public static int BUILD_TECHLAB = 3682;
-        public static int BUILD_REACTOR = 3683;
-        public static int BUILD_ORBITAL_COMMAND = 1516;
-        public static int BUILD_PLANETARY_FORTRESS = 1450;
-        public static int BUILD_COMMAND_CENTER = 318;
-        public static int BUILD_ENGINEERING_BAY = 322;
-        public static int BUILD_MISSILE_TURRET = 323;
-        public static int BUILD_ARMORY = 331;
-        
-        public static int TRAIN_SCV = 524;
-        public static int TRAIN_MARINE = 560;
-        public static int TRAIN_REAPER = 561;
-        public static int TRAIN_HELLION = 595;
-        public static int TRAIN_VIKING = 624;
-        public static int TRAIN_RAVEN = 622;
-        public static int TRAIN_SIEGE_TANK = 591;
-        public static int TRAIN_BANSHEE = 621;
-        public static int TRAIN_THOR = 594;
-        public static int TRAIN_CYCLONE = 597;
         
         public static int RESEARCH_BANSHEE_CLOAK = 790;
         public static int RESEARCH_INFERNAL_PREIGNITER = 761;
@@ -76,11 +50,9 @@ namespace Bot {
         public static int RETURN_MINERALS = 296;
 
 
-        public static readonly Dictionary<uint, int> FromBuilding = new Dictionary<uint, int> {
-            {Units.SUPPLY_DEPOT, BUILD_SUPPLY_DEPOT},
-            {Units.BARRACKS, BUILD_BARRACKS},
-            {Units.BUNKER, BUILD_BUNKER}
-            //you need to add whatever you need here
-        };
+        public static int GetID(uint unit) {
+            return (int) Controller.gameData.Units[(int) unit].AbilityId;
+        }
+        
     }
 }

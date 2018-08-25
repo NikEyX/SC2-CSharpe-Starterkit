@@ -15,7 +15,7 @@ namespace Bot
 
         public CLArgs(string[] args)
         {
-            for (int i = 0; i < args.Count(); i += 2)
+            for (var i = 0; i < args.Count(); i += 2)
             {
                 if (args[i] == "-g" || args[i] == "--GamePort")
                     gamePort = int.Parse(args[i + 1]);

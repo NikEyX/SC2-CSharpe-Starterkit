@@ -25,17 +25,8 @@ namespace Bot
 {
     class RaxBot : Bot
     {        
-        private static Random random = new Random(GenerateSeed());       
-        private Controller controller = new Controller(0);
+        private static Random random = new Random(GenerateSeed());
 
-        private ResponseGameInfo gameInfo;
-        private ResponseData gameData;
-
-        public RaxBot(ResponseGameInfo _gameInfo, ResponseData _gameData)
-        {
-            gameInfo = _gameInfo;
-            gameData = _gameData;
-        }
 
         private static int GenerateSeed() {
             var currentDayOfYear = DateTime.Now.DayOfYear;
@@ -59,84 +50,64 @@ namespace Bot
         }
 
 
-        public IEnumerable<SC2APIProtocol.Action> OnFrame(ResponseObservation obs, uint playerId)
+        public IEnumerable<SC2APIProtocol.Action> OnFrame()
         {
-            controller.OpenFrame(gameInfo, obs);
+            Controller.OpenFrame();
 
-            if (controller.frame == 0) {
+            if (Controller.frame == 0) {
                 Logger.Info("RaxBot");
                 Logger.Info("--------------------------------------");
-                Logger.Info("Map: {0}", gameInfo.MapName);
+                Logger.Info("Map: {0}", Controller.gameInfo.MapName);
                 Logger.Info("--------------------------------------");
             }
 
-            if (controller.frame == controller.SecsToFrames(1)) {
-                controller.Chat("gl hf");
+            if (Controller.frame == Controller.SecsToFrames(1)) {
+                Controller.Chat("gl hf");
             }
 
-            if ((controller.units.buildings.Count == 1) && (controller.units.buildings[0].Health <= controller.units.buildings[0].HealthMax * 0.35)) {
-                if (!controller.chatLog.Contains("gg"))
-                    controller.Chat("gg");                
+            if ((Controller.units.buildings.Count == 1) && (Controller.units.buildings[0].Health <= Controller.units.buildings[0].HealthMax * 0.35)) {
+                if (!Controller.chatLog.Contains("gg"))
+                    Controller.Chat("gg");                
             }
 
             //keep on buildings depots if supply is tight
-            if (controller.maxSupply - controller.currentSupply <= 5) {
-                if (controller.CanConstruct(Units.SUPPLY_DEPOT)) {
-                    controller.Construct(Units.SUPPLY_DEPOT);
+            if (Controller.maxSupply - Controller.currentSupply <= 5) {
+                if (Controller.CanConstruct(Units.SUPPLY_DEPOT)) {
+                    Controller.Construct(Units.SUPPLY_DEPOT);
                 }
             }
             
             //build barracks
-            if (controller.CanConstruct(Units.BARRACKS)) {
-                controller.Construct(Units.BARRACKS);
+            if (Controller.CanConstruct(Units.BARRACKS)) {
+                Controller.Construct(Units.BARRACKS);
             }
             
 
             //train worker
-            foreach (var cc in controller.units.resourceCenters) {
-                controller.TrainWorker(cc);                
+            foreach (var cc in Controller.units.resourceCenters) {
+                Controller.TrainWorker(cc);                
             }
             
                         
             //train marine
-            foreach (var barracks in controller.units.barracks) {
-                controller.TrainMarine(barracks);                
+            foreach (var barracks in Controller.units.barracks) {
+                Controller.TrainMarine(barracks);                
             }
 
             
             //attack when we have enough units
-            if (controller.units.army.Count > 20) {
-                //var armyUnits = controller.GetUnits(Units.ArmyUnits); //this works just as well
-                var armyUnits = controller.units.army;
+            if (Controller.units.army.Count > 20) {
+                //var armyUnits = Controller.GetUnits(Units.ArmyUnits); //this works just as well
+                var armyUnits = Controller.units.army;
                 
-                if (controller.enemyLocations.Count > 0)
-                    controller.Attack(armyUnits, controller.enemyLocations[0]);
+                if (Controller.enemyLocations.Count > 0)
+                    Controller.Attack(armyUnits, Controller.enemyLocations[0]);
 
             }
             
 
-            return controller.CloseFrame();
-        }
-    }
-
-    class RaxBotFactory : BotFactory
-    {
-        public Bot GetBot(ResponseGameInfo gameInfo, ResponseData gameData)
-        {
-            return new RaxBot(gameInfo, gameData);
+            return Controller.CloseFrame();
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

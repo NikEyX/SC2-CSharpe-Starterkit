@@ -1,10 +1,11 @@
 ﻿using System;
 using System.IO;
+// ReSharper disable AssignNullToNotNullAttribute
 
 namespace Bot {
-    public class Logger {
-        private static string logFile = null;        
-
+    public static class Logger {
+        private static string logFile = null;
+        
         private static void Initialize() {
             logFile = "Logs/" + DateTime.UtcNow.ToString("yyyy-MM-dd HH.mm.ss") + ".log";
             Directory.CreateDirectory(Path.GetDirectoryName(logFile));            
@@ -14,11 +15,12 @@ namespace Bot {
             if (logFile == null) 
                 Initialize();
                     
-            string msg = "[" + DateTime.UtcNow.ToString("HH:mm:ss") + " INFO] " + String.Format(line, parameters);
-            
-//            System.IO.StreamWriter file = new System.IO.StreamWriter(logFile, true);
-//            file.WriteLine(msg);
-//            file.Close();
+            var msg = "[" + DateTime.UtcNow.ToString("HH:mm:ss") + " INFO] " + string.Format(line, parameters);
+
+            var file = new System.IO.StreamWriter(logFile, true);
+            file.WriteLine(msg);
+            file.Close();
+
             Console.WriteLine(msg, parameters);
         }
     }

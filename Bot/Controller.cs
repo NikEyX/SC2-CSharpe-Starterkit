@@ -1,113 +1,117 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net.Mail;
 using System.Numerics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Schema;
 using Google.Protobuf.Reflection;
 using SC2APIProtocol;
+using Action = SC2APIProtocol.Action;
 
 namespace Bot {
     
-    public class Controller {
+    public static class Controller {
         //editable
-        private int frameDelay = 0; 
+        private static readonly int frameDelay = 0; 
         
         //don't edit
-        private ResponseObservation obs;
-        private List<SC2APIProtocol.Action> actions;
-        private ResponseGameInfo gameInfo;
-        private static Random random = new Random();
-        private double FRAMES_PER_SECOND = 22.4;        
+        private static readonly List<SC2APIProtocol.Action> actions = new List<Action>();        
+        private static readonly Random random = new Random();
+        private static double FRAMES_PER_SECOND = 22.4;        
         
-        public ulong frame = 0;        
-        public uint currentSupply = 0;
-        public uint maxSupply = 0;
-        public uint minerals = 0;
-        public uint vespene = 0;
+        public static ResponseGameInfo gameInfo;
+        public static ResponseData gameData;
+        public static ResponseObservation obs;
+        public static ulong frame = 0;        
+        public static uint currentSupply = 0;
+        public static uint maxSupply = 0;
+        public static uint minerals = 0;
+        public static uint vespene = 0;
         
-        public List<Vector3> enemyLocations = new List<Vector3>(); 
-        public List<string> chatLog = new List<string>(); 
+        public static readonly List<Vector3> enemyLocations = new List<Vector3>(); 
+        public static readonly List<string> chatLog = new List<string>(); 
 
         public class UnitsHolder {
-            public List<Unit> workers = new List<Unit>();
-            public List<Unit> army = new List<Unit>();
-            public List<Unit> barracks = new List<Unit>();
-            public List<Unit> depots = new List<Unit>();
-            public List<Unit> buildings = new List<Unit>();
-            public List<Unit> resourceCenters = new List<Unit>();
+            public readonly List<Unit> workers = new List<Unit>();
+            public readonly List<Unit> army = new List<Unit>();
+            public readonly List<Unit> barracks = new List<Unit>();
+            public readonly List<Unit> depots = new List<Unit>();
+            public readonly List<Unit> buildings = new List<Unit>();
+            public readonly List<Unit> resourceCenters = new List<Unit>();
         }
 
-        public UnitsHolder units = new UnitsHolder();
-
-        public Controller(int wait) {
-            Logger.Info("Instantiated Controller");
-            this.frameDelay = wait;
-        }
-
+        public static UnitsHolder units = new UnitsHolder();
         
-        public void Pause() {
+        
+        
+        public static void Pause() {
             Console.WriteLine("Press any key to continue...");
             while (Console.ReadKey().Key != ConsoleKey.Enter) {
                 //do nothing
             }
         }
 
-        public List<SC2APIProtocol.Action> CloseFrame() {
-            return actions;
-        }
-        
-        public ulong SecsToFrames(int seconds) {
+        public static ulong SecsToFrames(int seconds) {
             return (ulong) (FRAMES_PER_SECOND * seconds);
         }
 
-        private void PopulateInventory() {
-            this.units = new UnitsHolder();
-            foreach (Unit unit in obs.Observation.RawData.Units) {
+        private static void PopulateInventory() {
+            units = new UnitsHolder();
+            foreach (var unit in obs.Observation.RawData.Units) {
                 if (unit.Alliance != Alliance.Self) continue;
                 if (Units.ArmyUnits.Contains(unit.UnitType)) 
-                    this.units.army.Add(unit);
+                    units.army.Add(unit);
                 
                 if (Units.Workers.Contains(unit.UnitType)) 
-                    this.units.workers.Add(unit);
+                    units.workers.Add(unit);
                 
                 if (Units.Buildings.Contains(unit.UnitType)) 
-                    this.units.buildings.Add(unit);
+                    units.buildings.Add(unit);
                 
                 if (Units.ResourceCenters.Contains(unit.UnitType)) 
-                    this.units.resourceCenters.Add(unit);
+                    units.resourceCenters.Add(unit);
                
                 if ((unit.UnitType == Units.SUPPLY_DEPOT) || (unit.UnitType == Units.SUPPLY_DEPOT_LOWERED)) 
-                    this.units.depots.Add(unit);
+                    units.depots.Add(unit);
 
                 if ((unit.UnitType == Units.BARRACKS) || (unit.UnitType == Units.BARRACKS_FLYING)) 
-                    this.units.barracks.Add(unit);
+                    units.barracks.Add(unit);
             } 
         }
         
-        public void OpenFrame(ResponseGameInfo gameInfo, ResponseObservation obs) {            
-            this.obs = obs;            
-            this.gameInfo = gameInfo;                    
-            this.actions = new List<SC2APIProtocol.Action>();
+        public static List<SC2APIProtocol.Action> CloseFrame() {
+            return actions;
+        }
 
-            if (obs == null) {
-                Logger.Info("ResponseObservation is null! The application will terminate.");
+        
+        public static void OpenFrame() {                              
+            if ((gameInfo == null) || (gameData == null) || (obs == null)) {
+                if (gameInfo == null)
+                    Logger.Info("GameInfo is null! The application will terminate.");
+                else if (gameData == null)
+                    Logger.Info("GameData is null! The application will terminate.");
+                else
+                    Logger.Info("ResponseObservation is null! The application will terminate.");
                 Pause();
                 Environment.Exit(0);
             }
+            
+            actions.Clear();
 
             foreach (var chat in obs.Chat) {
-                this.chatLog.Add(chat.Message);
+                chatLog.Add(chat.Message);
             }
 
-            this.frame = obs.Observation.GameLoop;
-            this.currentSupply = obs.Observation.PlayerCommon.FoodUsed;
-            this.maxSupply = obs.Observation.PlayerCommon.FoodCap;
-            this.minerals = obs.Observation.PlayerCommon.Minerals;
-            this.vespene = obs.Observation.PlayerCommon.Vespene;
+            frame = obs.Observation.GameLoop;
+            currentSupply = obs.Observation.PlayerCommon.FoodUsed;
+            maxSupply = obs.Observation.PlayerCommon.FoodCap;
+            minerals = obs.Observation.PlayerCommon.Minerals;
+            vespene = obs.Observation.PlayerCommon.Vespene;
                 
             PopulateInventory();
 
+            //initialization
             if (frame == 0) {
                 var rcPosition = GetPosition(units.resourceCenters[0]);
                 foreach (var startLocation in gameInfo.StartRaw.StartLocations) {
@@ -124,44 +128,44 @@ namespace Bot {
         }
 
 
-        public void AddAction(SC2APIProtocol.Action action) {
+        public static void AddAction(SC2APIProtocol.Action action) {
             actions.Add(action);
         }
 
 
-        public void Chat(string message, bool team=false) {            
-            ActionChat actionChat = new ActionChat();
+        public static void Chat(string message, bool team=false) {            
+            var actionChat = new ActionChat();
             if (team)
                 actionChat.Channel = ActionChat.Types.Channel.Team;
             else
                 actionChat.Channel = ActionChat.Types.Channel.Broadcast;
             actionChat.Message = message;
             
-            SC2APIProtocol.Action action = new SC2APIProtocol.Action();
+            var action = new SC2APIProtocol.Action();
             action.ActionChat = actionChat;
             AddAction(action);
         }
         
         
         
-        public Vector3 GetPosition(Unit unit) {
+        public static Vector3 GetPosition(Unit unit) {
             return new Vector3(unit.Pos.X, unit.Pos.Y, unit.Pos.Z);
         }
 
-        public double GetDistance(Unit unit1, Unit unit2) {
+        public static double GetDistance(Unit unit1, Unit unit2) {
             return Vector3.Distance(GetPosition(unit1), GetPosition(unit2));
         }
 
-        public double GetDistance(Unit unit, Vector3 location) {
+        public static double GetDistance(Unit unit, Vector3 location) {
             return Vector3.Distance(GetPosition(unit), location);
         }          
         
-        public double GetDistance(Vector3 pos1, Vector3 pos2) {
+        public static double GetDistance(Vector3 pos1, Vector3 pos2) {
             return Vector3.Distance(pos1, pos2);
         }                
         
 
-        public Unit GetMineralField() {
+        public static Unit GetMineralField() {
             var mineralFields = GetUnits(Units.MineralFields, alliance:Alliance.Neutral);            
             foreach (var mf in mineralFields) {
                 foreach (var rc in units.resourceCenters) {
@@ -171,7 +175,7 @@ namespace Bot {
             return null;
         }
 
-        public void Attack(List<Unit> units, Vector3 target) {
+        public static void Attack(List<Unit> units, Vector3 target) {
             var action = CreateRawUnitCommand(Abilities.ATTACK);            
             action.ActionRaw.UnitCommand.TargetWorldSpacePos = new Point2D();
             action.ActionRaw.UnitCommand.TargetWorldSpacePos.X = target.X;
@@ -181,28 +185,32 @@ namespace Bot {
             AddAction(action);
         }
         
-        public List<Unit> GetUnits(HashSet<uint> hashset, Alliance alliance=Alliance.Self)
+        public static List<Unit> GetUnits(HashSet<uint> hashset, Alliance alliance=Alliance.Self)
         {
-            List<Unit> units = new List<Unit>();                           
-            foreach (Unit unit in obs.Observation.RawData.Units) {
+            var units = new List<Unit>();                           
+            foreach (var unit in obs.Observation.RawData.Units) {
                 if ((hashset.Contains(unit.UnitType)) && (unit.Alliance == alliance)) 
                     units.Add(unit);
             }
             return units;
         }
         
-        private List<Unit> GetUnits(uint unitType, Alliance alliance=Alliance.Self)
+        private static List<Unit> GetUnits(uint unitType, Alliance alliance=Alliance.Self)
         {
-            List<Unit> units = new List<Unit>();
-            foreach (Unit unit in obs.Observation.RawData.Units) {
+            var units = new List<Unit>();
+            foreach (var unit in obs.Observation.RawData.Units) {
                 if ((unit.UnitType == unitType) && (unit.Alliance == alliance))
                     units.Add(unit);
             }
             return units;
         }
+
+
+        public static bool CanAfford(uint buildingType) {            
+            return (minerals >= gameData.Units[(int) buildingType].MineralCost) && (vespene >= gameData.Units[(int) buildingType].VespeneCost);       
+        }
         
-        
-        public bool CanConstruct(uint buildingType)
+        public static bool CanConstruct(uint buildingType)
         {            
             if (units.workers.Count == 0) return false;                        
 
@@ -213,32 +221,32 @@ namespace Bot {
             }
 
             if (buildingType == Units.SUPPLY_DEPOT)
-                return (minerals >= 100);            
-            
-            
+                return CanAfford(buildingType);
+                        
             foreach (var building in units.depots)
                 if (building.BuildProgress < 1.0) return false;
             
             if (buildingType == Units.BARRACKS)
-                return (minerals >= 150);
-
-            return false;
+                return CanAfford(buildingType);
+            
+            //catch all
+            return CanAfford(buildingType);
         }
 
-        private SC2APIProtocol.Action CreateRawUnitCommand(int ability) {            
-            SC2APIProtocol.Action action = new SC2APIProtocol.Action();
+        private static SC2APIProtocol.Action CreateRawUnitCommand(int ability) {            
+            var action = new SC2APIProtocol.Action();
             action.ActionRaw = new ActionRaw();
             action.ActionRaw.UnitCommand = new ActionRawUnitCommand();
             action.ActionRaw.UnitCommand.AbilityId = ability;
             return action;
         }       
 
-        private uint GetUnitOrder(Unit unit) {
+        private static uint GetUnitOrder(Unit unit) {
             if (unit.Orders.Count == 0) return 0;
             return unit.Orders[0].AbilityId;
         }
 
-        public void TrainWorker(Unit resourceCenter, bool queue=false) {
+        public static void TrainWorker(Unit resourceCenter, bool queue=false) {
             if (resourceCenter == null) return;            
             
             if ((!queue) && (GetUnitOrder(resourceCenter) == Abilities.TRAIN_SCV)) 
@@ -250,7 +258,7 @@ namespace Bot {
         }
 
 
-        public void TrainMarine(Unit barracks, bool queue=false) {
+        public static void TrainMarine(Unit barracks, bool queue=false) {
             if (barracks == null) return;                        
             if ((!queue) && (GetUnitOrder(barracks) == Abilities.TRAIN_MARINE)) 
                 return;
@@ -261,7 +269,7 @@ namespace Bot {
         }
 
         
-        public void Construct(uint unitType) {
+        public static void Construct(uint unitType) {
             var worker = GetAvailableWorker();
             if (worker == null) return;
 
@@ -279,7 +287,7 @@ namespace Bot {
             Vector3 constructionSpot;
             while (true) {
                 constructionSpot = new Vector3(startingSpot.X + random.Next(-radius, radius + 1), startingSpot.Y + random.Next(-radius, radius + 1), worker.Pos.Z);
-                bool valid = true;
+                var valid = true;
 
                 //avoid building in the mineral line
                 foreach (var w in units.workers) {
@@ -313,7 +321,7 @@ namespace Bot {
             Logger.Info("Attempting to construct: {0} @ {1} / {2}", unitType.ToString(), constructionSpot.X, constructionSpot.Y);            
         }
 
-        public Unit GetAvailableWorker() {
+        public static Unit GetAvailableWorker() {
             foreach (var worker in units.workers) {
                 var order = GetUnitOrder(worker);
                 if (order == 0) return worker;
@@ -326,9 +334,9 @@ namespace Bot {
         }
 
         
-        private void FocusCamera(Unit unit) {
+        private static void FocusCamera(Unit unit) {
             if (unit == null) return;
-            SC2APIProtocol.Action action = new SC2APIProtocol.Action();
+            var action = new SC2APIProtocol.Action();
             action.ActionRaw = new ActionRaw();
             action.ActionRaw.CameraMove = new ActionRawCameraMove();
             action.ActionRaw.CameraMove.CenterWorldSpace = new Point();

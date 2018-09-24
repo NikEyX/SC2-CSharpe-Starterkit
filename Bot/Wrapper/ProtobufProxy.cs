@@ -13,6 +13,7 @@ namespace Bot {
 
         public async Task Connect(string address, int port) {
             clientSocket = new ClientWebSocket();
+            clientSocket.Options.KeepAliveInterval = TimeSpan.FromDays(100);
             var adr = string.Format("ws://{0}:{1}/sc2api", address, port);
             var uri = new Uri(adr);
             await clientSocket.ConnectAsync(uri, token);

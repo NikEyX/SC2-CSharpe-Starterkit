@@ -9,7 +9,8 @@ using SC2APIProtocol;
 namespace Bot {
     public class ProtobufProxy {
         private ClientWebSocket clientSocket;
-        private readonly CancellationToken token = new CancellationTokenSource().Token;
+        private const int connectTimeout = 20000;
+        private const int readWriteTimeout = 120000;
 
         public async Task Connect(string address, int port) {
             clientSocket = new ClientWebSocket();
@@ -19,7 +20,10 @@ namespace Bot {
             clientSocket.Options.KeepAliveInterval = TimeSpan.FromDays(30);
             var adr = string.Format("ws://{0}:{1}/sc2api", address, port);
             var uri = new Uri(adr);
-            await clientSocket.ConnectAsync(uri, token);
+            using(CancellationTokenSource cancellationSource = new CancellationTokenSource()) {
+                cancellationSource.CancelAfter(connectTimeout);
+                await clientSocket.ConnectAsync(uri, cancellationSource.Token);
+            }
 
             await Ping();
         }
@@ -45,8 +49,11 @@ namespace Bot {
             var sendBuf = new byte[1024 * 1024];
             var outStream = new CodedOutputStream(sendBuf);
             request.WriteTo(outStream);
-            await clientSocket.SendAsync(new ArraySegment<byte>(sendBuf, 0, (int) outStream.Position),
-                WebSocketMessageType.Binary, true, token);
+            using(CancellationTokenSource cancellationSource = new CancellationTokenSource()) {
+                cancellationSource.CancelAfter(readWriteTimeout);
+                await clientSocket.SendAsync(new ArraySegment<byte>(sendBuf, 0, (int) outStream.Position),
+                    WebSocketMessageType.Binary, true, cancellationSource.Token);
+            }
         }
 
         private async Task<Response> ReadMessage() {
@@ -54,21 +61,24 @@ namespace Bot {
             var finished = false;
             var curPos = 0;
             while (!finished) {
-                var left = receiveBuf.Length - curPos;
-                if (left < 0) {
-                    // No space left in the array, enlarge the array by doubling its size.
-                    var temp = new byte[receiveBuf.Length * 2];
-                    Array.Copy(receiveBuf, temp, receiveBuf.Length);
-                    receiveBuf = temp;
-                    left = receiveBuf.Length - curPos;
+                using(CancellationTokenSource cancellationSource = new CancellationTokenSource()) {
+                    var left = receiveBuf.Length - curPos;
+                    if (left < 0) {
+                        // No space left in the array, enlarge the array by doubling its size.
+                        var temp = new byte[receiveBuf.Length * 2];
+                        Array.Copy(receiveBuf, temp, receiveBuf.Length);
+                        receiveBuf = temp;
+                        left = receiveBuf.Length - curPos;
+                    }
+
+                    cancellationSource.CancelAfter(readWriteTimeout);
+                    var result = await clientSocket.ReceiveAsync(new ArraySegment<byte>(receiveBuf, curPos, left), cancellationSource.Token);
+                    if (result.MessageType != WebSocketMessageType.Binary)
+                        throw new Exception("Expected Binary message type.");
+
+                    curPos += result.Count;
+                    finished = result.EndOfMessage;
                 }
-
-                var result = await clientSocket.ReceiveAsync(new ArraySegment<byte>(receiveBuf, curPos, left), token);
-                if (result.MessageType != WebSocketMessageType.Binary)
-                    throw new Exception("Expected Binary message type.");
-
-                curPos += result.Count;
-                finished = result.EndOfMessage;
             }
 
             var response = Response.Parser.ParseFrom(new MemoryStream(receiveBuf, 0, curPos));

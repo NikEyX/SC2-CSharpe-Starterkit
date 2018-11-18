@@ -6,6 +6,7 @@ using System.IO;
 namespace Bot {
     public static class Logger {
         private static string logFile;
+        private static bool stdoutClosed;
 
         private static void Initialize() {
             logFile = "Logs/" + DateTime.UtcNow.ToString("yyyy-MM-dd HH.mm.ss") + ".log";
@@ -22,9 +23,16 @@ namespace Bot {
             var file = new StreamWriter(logFile, true);
             file.WriteLine(msg);
             file.Close();
-
-            Console.WriteLine(msg, parameters);
-        }        
+            // do not write to stdout if it is closed (LadderServer on linux)
+            if(!stdoutClosed) {
+                try {
+                    Console.WriteLine(msg, parameters);
+                }
+                catch {
+                    stdoutClosed = true;
+                }
+            }
+        }
 
         public static void Info(string line, params object[] parameters) {
             WriteLine("INFO", line, parameters);

@@ -16,10 +16,6 @@ namespace Bot {
         private string starcraftExe;
         private string starcraftMaps;
 
-        public GameConnection() {
-            readSettings();
-        }
-
         private void StartSC2Instance(int port) {
             var processStartInfo = new ProcessStartInfo(starcraftExe);
             processStartInfo.Arguments = string.Format("-listen {0} -port {1} -displayMode 0", address, port);
@@ -80,7 +76,7 @@ namespace Bot {
             var response = await proxy.SendRequest(request);
         }
 
-        private void readSettings() {
+        public void readSettings() {
             var myDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var executeInfo = Path.Combine(myDocuments, "StarCraft II", "ExecuteInfo.txt");
             if (!File.Exists(executeInfo))

@@ -82,9 +82,9 @@ namespace Bot {
 
         private void readSettings() {
             var myDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            var executeInfo = Path.Combine(myDocuments, "StarCraft II", "ExecuteInfo.txt");
+            var executeInfo = Path.Combine(myDocuments, "SC2AI/StarCraftII", "ExecuteInfo.txt");
             if (!File.Exists(executeInfo))
-                executeInfo = Path.Combine(myDocuments, "StarCraftII", "ExecuteInfo.txt");
+                executeInfo = Path.Combine(myDocuments, "SC2AI/StarCraftII", "ExecuteInfo.txt");
 
             if (File.Exists(executeInfo)) {
                 var lines = File.ReadAllLines(executeInfo);
@@ -192,7 +192,10 @@ namespace Bot {
                 var observation = response.Observation;
 
                 if (response.Status == Status.Ended || response.Status == Status.Quit)
-                    break;
+                    {
+                        Logger.Info("Game end could be called here."); //ToDo: Implement onGameEnd()
+                        break;
+                    }
 
                 Controller.obs = observation;
                 var actions = bot.OnFrame();
@@ -228,7 +231,7 @@ namespace Bot {
             await Connect(gamePort);
             var playerId = await JoinGameLadder(myRace, startPort);
             await Run(bot, playerId);
-            await RequestLeaveGame();
+            // await RequestLeaveGame();
         }
 
         public async Task RunLadder(Bot bot, Race myRace, string[] args) {

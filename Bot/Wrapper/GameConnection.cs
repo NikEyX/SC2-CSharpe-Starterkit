@@ -82,9 +82,9 @@ namespace Bot {
 
         private void readSettings() {
             var myDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            var executeInfo = Path.Combine(myDocuments, "SC2AI/StarCraftII", "ExecuteInfo.txt");
+            var executeInfo = Path.Combine(myDocuments, "StarCraft II", "ExecuteInfo.txt");
             if (!File.Exists(executeInfo))
-                executeInfo = Path.Combine(myDocuments, "SC2AI/StarCraftII", "ExecuteInfo.txt");
+                executeInfo = Path.Combine(myDocuments, "StarCraftII", "ExecuteInfo.txt");
 
             if (File.Exists(executeInfo)) {
                 var lines = File.ReadAllLines(executeInfo);
@@ -193,7 +193,14 @@ namespace Bot {
 
                 if (response.Status == Status.Ended || response.Status == Status.Quit)
                     {
-                        Logger.Info("Game end could be called here."); //ToDo: Implement onGameEnd()
+                        foreach (var result in observation.PlayerResult)
+                        {
+                            if (result.PlayerId == playerId)
+                            {
+                                Logger.Info("Result: {0}", result.Result);
+                                // Do whatever you want with the info
+                            }
+                        }
                         break;
                     }
 

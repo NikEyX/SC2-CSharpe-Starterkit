@@ -192,7 +192,17 @@ namespace Bot {
                 var observation = response.Observation;
 
                 if (response.Status == Status.Ended || response.Status == Status.Quit)
-                    break;
+                    {
+                        foreach (var result in observation.PlayerResult)
+                        {
+                            if (result.PlayerId == playerId)
+                            {
+                                Logger.Info("Result: {0}", result.Result);
+                                // Do whatever you want with the info
+                            }
+                        }
+                        break;
+                    }
 
                 Controller.obs = observation;
                 var actions = bot.OnFrame();
@@ -228,7 +238,7 @@ namespace Bot {
             await Connect(gamePort);
             var playerId = await JoinGameLadder(myRace, startPort);
             await Run(bot, playerId);
-            await RequestLeaveGame();
+            // await RequestLeaveGame();
         }
 
         public async Task RunLadder(Bot bot, Race myRace, string[] args) {

@@ -21,8 +21,10 @@ namespace Bot {
         private static void Main(string[] args) {
             try {
                 gc = new GameConnection();
-                if (args.Length == 0)
+                if (args.Length == 0){
+                    gc.readSettings();
                     gc.RunSinglePlayer(bot, mapName, race, opponentRace, opponentDifficulty).Wait();
+                }
                 else
                     gc.RunLadder(bot, race, args).Wait();
             }

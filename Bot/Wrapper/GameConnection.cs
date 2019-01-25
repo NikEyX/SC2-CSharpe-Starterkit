@@ -73,7 +73,14 @@ namespace Bot {
 
             var request = new Request();
             request.CreateGame = createGame;
-            var response = await proxy.SendRequest(request);
+            var response = CheckResponse(await proxy.SendRequest(request));
+
+            if(response.CreateGame.Error != ResponseCreateGame.Types.Error.Unset) {
+                Logger.Error("CreateGame error: {0}", response.CreateGame.Error.ToString());
+                if(!String.IsNullOrEmpty(response.CreateGame.ErrorDetails)) {
+                    Logger.Error(response.CreateGame.ErrorDetails);
+                }
+            }
         }
 
         public void readSettings() {
@@ -112,7 +119,15 @@ namespace Bot {
 
             var request = new Request();
             request.JoinGame = joinGame;
-            var response = await proxy.SendRequest(request);
+            var response = CheckResponse(await proxy.SendRequest(request));
+
+            if(response.JoinGame.Error != ResponseJoinGame.Types.Error.Unset) {
+                Logger.Error("JoinGame error: {0}", response.JoinGame.Error.ToString());
+                if(!String.IsNullOrEmpty(response.JoinGame.ErrorDetails)) {
+                    Logger.Error(response.JoinGame.ErrorDetails);
+                }
+            }
+
             return response.JoinGame.PlayerId;
         }
 
@@ -136,7 +151,15 @@ namespace Bot {
             var request = new Request();
             request.JoinGame = joinGame;
 
-            var response = await proxy.SendRequest(request);
+            var response = CheckResponse(await proxy.SendRequest(request));
+
+            if(response.JoinGame.Error != ResponseJoinGame.Types.Error.Unset) {
+                Logger.Error("JoinGame error: {0}", response.JoinGame.Error.ToString());
+                if(!String.IsNullOrEmpty(response.JoinGame.ErrorDetails)) {
+                    Logger.Error(response.JoinGame.ErrorDetails);
+                }
+            }
+
             return response.JoinGame.PlayerId;
         }
 
@@ -240,6 +263,16 @@ namespace Bot {
         public async Task RunLadder(Bot bot, Race myRace, string[] args) {
             var commandLineArgs = new CLArgs(args);
             await RunLadder(bot, myRace, commandLineArgs.GamePort, commandLineArgs.StartPort);
+        }
+
+        private Response CheckResponse(Response response){
+            if(response.Error.Count > 0) {
+                Logger.Error("Response errors:");
+                foreach(var error in response.Error) {
+                    Logger.Error(error);
+                }
+            }
+            return response;
         }
     }
 }
